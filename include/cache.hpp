@@ -42,17 +42,17 @@ template <typename ValueType, typename KeyType> class CacheLevel {
 
 public:
   /// Return the value associated with \p Key or std::nullopt if it exists.
-  std::optional<ValueType> findElement(KeyType Key);
+  std::optional<ValueType> findElement(const KeyType& Key);
 
   /// Insert \p Key with \p Value in cache and notify the cache policy
-  void insertElement(KeyType Key, ValueType Value);
+  void insertElement(const KeyType& Key, const ValueType* Value);
 
   /// Remove \p Key and notify the cache policy after that
-  void eraseElement(KeyType Key);
+  void eraseElement(const KeyType& Key);
 
 private:
   /// Values currently stored in this cache level.
-  std::unordered_map<KeyType, ValueType> map_;
+  std::unordered_map<KeyType, ValueType*> map_;
 
   /// Replacement policy used when this level.
   std::unique_ptr<CachePolicy<KeyType>> policy_;
