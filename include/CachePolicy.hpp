@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 template <typename KeyType> class CachePolicy {
@@ -28,9 +29,9 @@ public:
   /// hidden policy logic. Use it if you erase element manually
   virtual void onCacheErase(KeyType Key) = 0;
 
-  /// Return Key of element that need to erase. Use it if haven't enough space
-  /// in cache
-  virtual KeyType selectVictim(void) = 0;
+  /// Return Key of element that need to erase or std::nullopt if cache is
+  /// empty. Use it if haven't enough space in cache.
+  virtual std::optional<KeyType> selectVictim(void) = 0;
 
   virtual ~CachePolicy() = default;
 };
