@@ -21,10 +21,11 @@ template <typename ValueType, typename KeyType> class MultiLevelCache {
   /// levels.
 
 public:
-  /// Vetor of cache levels ordered according to lookup priority.
+  /// Vector of cache levels ordered according to lookup priority.
   using CacheLevelVector =
       std::vector<std::unique_ptr<CacheLevel<ValueType, KeyType>>>;
 
+  /// Constructor with reading config file
   MultiLevelCache(const char *ConfigFilename) {
 
     using PolicyPtr = std::unique_ptr<CachePolicy<KeyType>>;

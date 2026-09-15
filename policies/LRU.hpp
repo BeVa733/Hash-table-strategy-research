@@ -6,6 +6,7 @@
 
 template <typename KeyType> class LRUPolicy : CachePolicy<KeyType> {
 
+public:
   LRUPolicy() {};
 
   std::string getPolicyName() override {
