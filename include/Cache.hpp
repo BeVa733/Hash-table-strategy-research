@@ -90,9 +90,9 @@ private:
 
 public:
   /// Number of successful lookups.
-  uint32_t CountHits_;
+  uint32_t HitCount_;
   /// Number of unsuccessful lookups.
-  uint32_t CountMisses_;
+  uint32_t MissCount_;
 };
 
 template <typename ValueType, typename KeyType> class CacheLevel {
