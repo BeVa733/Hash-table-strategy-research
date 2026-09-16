@@ -6,7 +6,7 @@
 
 #include "../include/CachePolicy.hpp"
 
-template <typename KeyType> class LRUPolicy : CachePolicy<KeyType> {
+template <typename KeyType> class LRUPolicy : public CachePolicy<KeyType> {
 
 public:
   LRUPolicy(std::size_t Size) : Capacity_(Size) {};
@@ -39,7 +39,7 @@ public:
 
   void onCacheErase(const KeyType &Key) override {
     auto It = std::find(List_.begin(), List_.end(), Key);
-		
+
     if (It != List_.end()) {
       List_.erase(It);
     } else {
@@ -49,11 +49,11 @@ public:
 
   std::optional<KeyType> selectVictim(void) override {
     if (!List_.empty()) {
-			return --(List_.end());
-		} else {
-			std::cerr << "[LRU] Warning: try to search victim in empty cache\n";
-    	return std::nullopt;
-		}
+      return *(--(List_.end())); // Last list element
+    } else {
+      std::cerr << "[LRU] Warning: try to search victim in empty cache\n";
+      return std::nullopt;
+    }
   }
 
 private:
