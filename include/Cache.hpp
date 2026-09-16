@@ -74,16 +74,17 @@ public:
       std::cin >> LevelCapacity;
 
       // Add cache level into levels vector
-      CacheLevels.emplace_back(
-          std::make_unique<CacheLevel<ValueType, KeyType>>(
-              LevelCapacity, It->second(LevelCapacity)));
+      CacheLevels.emplace_back(std::make_unique<CacheLevel<ValueType, KeyType>>(
+          LevelCapacity, It->second(LevelCapacity)));
     }
   }
 
   /// Return a cached value for \p Key or std::nullopt after a cache miss.
   std::optional<ValueType *> accessElement(KeyType Key) {
     std::optional<ValueType *> Value = std::nullopt;
-    for (CacheLevel<ValueType, KeyType> &CL : CacheLevels) {
+
+    // use & because unique ptr cannot be copied
+    for (auto &CL : CacheLevels) {
       Value = CL->findElement(Key);
 
       if (Value.has_value()) {
@@ -98,7 +99,7 @@ public:
 
         if (CL->hasFreeSpace()) {
 
-          CL->insertElement(Key, Value);
+          CL->insertElement(Key, *Value);
           CL->Policy->onCacheInsert(Key);
 
           return Value;
@@ -158,9 +159,9 @@ public:
   }
 
   /// Insert \p Key with \p Value in cache and notify the cache policy
-  void insertElement(const KeyType &Key, const ValueType *Value) {
+  void insertElement(const KeyType &Key, ValueType *Value) {
 
-    if (!Map.contains(Key)) {
+    if (Map.find(Key) == Map.end()) {
       Map.emplace(Key, Value);
     } else {
       std::cerr
