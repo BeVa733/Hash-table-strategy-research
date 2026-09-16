@@ -105,13 +105,32 @@ public:
       : Capacity_(Capacity), Policy_(std::move(Policy)) {}
 
   /// Return the value associated with \p Key or std::nullopt if it exists.
-  std::optional<ValueType> findElement(const KeyType &Key);
+  std::optional<ValueType *> findElement(const KeyType &Key) {
+
+    auto It = Map_.find(Key);
+
+    if (It != Map_.end()) {
+      return It->second;
+    } else {
+      return std::nullopt;
+    }
+  }
 
   /// Insert \p Key with \p Value in cache and notify the cache policy
-  void insertElement(const KeyType &Key, const ValueType *Value);
+  void insertElement(const KeyType &Key, const ValueType *Value) {
+
+    if (!Map_.contains(Key)) {
+      Map_.emplace(Key, Value);
+    } else {
+      std::cerr
+          << "[CACHE] Warning: try to insert new element with existing key\n";
+    }
+  }
 
   /// Remove \p Key and notify the cache policy after that
-  void eraseElement(const KeyType &Key);
+  void eraseElement(const KeyType &Key) {
+    Map_.erase(Key);
+  }
 
 private:
   /// Max number of elements in this cache level
