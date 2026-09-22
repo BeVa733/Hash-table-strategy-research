@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../policies/LRU.hpp"
+#include "../policies/LFU.hpp"
 #include "CachePolicy.hpp"
 
 #include <cstdint>
