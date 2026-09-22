@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../policies/LRU.hpp"
 #include "../policies/LFU.hpp"
+#include "../policies/LRU.hpp"
 #include "CachePolicy.hpp"
 
 #include <cstdint>
@@ -36,8 +36,12 @@ public:
     // costructors. Append new policies here after impementation
     std::unordered_map<std::string, std::function<PolicyPtr(std::size_t)>>
         Constructors{
-            {"LRU", [](std::size_t Capacity) {
+            {"LRU",
+             [](std::size_t Capacity) {
                return std::make_unique<LRUPolicy<KeyType>>(Capacity);
+             }                   },
+            {"LFU", [](std::size_t Capacity) {
+               return std::make_unique<LFUPolicy<KeyType>>(Capacity);
              }}
     };
 
