@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -26,52 +27,52 @@ public:
       std::vector<std::unique_ptr<CacheLevel<ValueType, KeyType>>>;
 
   /// Constructor with reading config file
-  MultiLevelCache(const char *ConfigFilename) {
+  explicit MultiLevelCache(const char *ConfigFilename) {
 
     using PolicyPtr = std::unique_ptr<CachePolicy<KeyType>>;
 
     // this hash map make connection between string policy names and class
     // costructors. Append new policies here after impementation
     std::unordered_map<std::string, std::function<PolicyPtr(std::size_t)>>
-        Constructors{{"LRU",
-                      [](std::size_t Capacity) {
-                        return std::make_unique<LRUPolicy<KeyType>>(Capacity);
-                      }},
-                     {"FIFO", [](std::size_t Capacity) { return nullptr; }}};
+        Constructors{
+            {"LRU", [](std::size_t Capacity) {
+               return std::make_unique<LRUPolicy<KeyType>>(Capacity);
+             }}
+    };
 
     std::ifstream ConfigFile(ConfigFilename);
     if (!ConfigFile) {
-      std::cerr << "FATAL: Unable to open config file: " << ConfigFilename
-                << '\n';
-      return; // TODO replace all return with exceptions
+      throw std::runtime_error(std::string("Unable to open config file: ") +
+                               ConfigFilename);
     }
 
     // Read number of cache levels
     if (!(ConfigFile >> NumLevels_)) {
-      std::cerr << "FATAL: Incorrect config format. At first must be number of "
-                   "cache levels\n";
-      return;
+      throw std::runtime_error(
+          "Incorrect config format: expected number of cache levels");
     }
 
     // read policy names in cycle
     for (int i = 0; i < NumLevels_; ++i) {
       std::string PolicyName;
       if (!(ConfigFile >> PolicyName)) {
-        std::cerr << "FATAL: Incorrect config format. Unexpected symbol "
-                     "instead of policy name\n";
-        return;
+        throw std::runtime_error(
+            "Incorrect config format: expected policy name for level " +
+            std::to_string(i));
       }
 
       // find policy in hash map
       auto It = Constructors.find(PolicyName);
       if (It == Constructors.end()) {
-        std::cerr << "FATAL: Unknown name of policy in config file\n";
-        return;
+        throw std::runtime_error("Unknown cache policy: " + PolicyName);
       }
 
       // get level capacity from stdin
       std::size_t LevelCapacity;
-      std::cin >> LevelCapacity;
+      if (!(std::cin >> LevelCapacity)) {
+        throw std::runtime_error("Unable to read capacity for cache level " +
+                                 std::to_string(i));
+      }
 
       // Add cache level into levels vector
       CacheLevels.emplace_back(std::make_unique<CacheLevel<ValueType, KeyType>>(
@@ -81,43 +82,76 @@ public:
 
   /// Return a cached value for \p Key or std::nullopt after a cache miss.
   std::optional<ValueType *> accessElement(KeyType Key) {
-    std::optional<ValueType *> Value = std::nullopt;
+    ValueType *Value = nullptr;
+    int FoundLevel   = CacheLevels.size();
 
-    // use & because unique ptr cannot be copied
-    for (auto &CL : CacheLevels) {
-      Value = CL->findElement(Key);
-
-      if (Value.has_value()) {
-
-        CL->Policy->onCacheHit(Key);
-        ++HitCount_;
-        return Value;
-
-      } else {
-
-        Value = slowGetPage(Key);
-
-        if (CL->hasFreeSpace()) {
-
-          CL->insertElement(Key, *Value);
-          CL->Policy->onCacheInsert(Key);
-
-          return Value;
-        }
-
-        if (CL->Policy->needInsertInCache(Key)) {
-
-          std::optional<KeyType> VictimElement = CL->Policy->selectVictim();
-
-          if (VictimElement.has_value()) {
-            CL->eraseElement(*VictimElement);
-            CL->Policy->onCacheErase(*VictimElement);
-          }
-        }
+    // Complete the lookup before accessing the slow data source.
+    for (int Level = 0; Level < CacheLevels.size(); ++Level) {
+      std::optional<ValueType *> CachedValue =
+          CacheLevels[Level]->findElement(Key);
+      if (!CachedValue) {
+        continue;
       }
+
+      Value      = *CachedValue;
+      FoundLevel = Level;
+      ++HitCount_;
+
+      CacheLevels[Level]->Policy->onCacheHit(Key);
+
+      // Don't need promotion if in 1 level
+      if (Level == 0) {
+        return Value;
+      }
+
+      CacheLevels[Level]->eraseElement(Key);
+      CacheLevels[Level]->Policy->onCacheErase(Key);
+      break;
     }
 
-    return std::nullopt;
+    if (FoundLevel == CacheLevels.size()) {
+      ++MissCount_;
+      Value = slowGetPage(Key); // return nullopt if no Page, but in this task
+                                // in couldn't happend
+    }
+
+    // Insert into 1 level. Every displaced entry becomes the candidate for the
+    // next level; a candidate displaced from the last level is delete.
+    KeyType PendingKey      = Key;
+    ValueType *PendingValue = Value;
+
+    for (auto &CL : CacheLevels) {
+      if (!CL->Policy->needInsertInCache(PendingKey)) {
+        continue;
+      }
+
+      if (CL->hasFreeSpace()) {
+        if (CL->insertElement(PendingKey, PendingValue)) {
+          CL->Policy->onCacheInsert(PendingKey);
+        }
+        break;
+      }
+
+      std::optional<KeyType> VictimKey = CL->Policy->selectVictim();
+      if (!VictimKey) {
+        continue;
+      }
+
+      std::optional<ValueType *> VictimValue = CL->eraseElement(*VictimKey);
+      if (!VictimValue) {
+        continue;
+      }
+      CL->Policy->onCacheErase(*VictimKey);
+
+      if (CL->insertElement(PendingKey, PendingValue)) {
+        CL->Policy->onCacheInsert(PendingKey);
+      }
+
+      PendingKey   = *VictimKey;
+      PendingValue = *VictimValue;
+    }
+
+    return Value;
   }
 
   /// Function for immitate slow process of getting value
@@ -125,16 +159,16 @@ public:
 
 private:
   /// Cache levels number
-  std::size_t NumLevels_;
+  std::size_t NumLevels_{0};
 
   /// Cache levels searched by access().
   CacheLevelVector CacheLevels;
 
 public:
   /// Number of successful lookups.
-  uint32_t HitCount_;
+  uint32_t HitCount_{0};
   /// Number of unsuccessful lookups.
-  uint32_t MissCount_;
+  uint32_t MissCount_{0};
 };
 
 template <typename ValueType, typename KeyType> class CacheLevel {
@@ -158,19 +192,30 @@ public:
     }
   }
 
-  /// Insert \p Key with \p Value in cache and notify the cache policy
-  void insertElement(const KeyType &Key, ValueType *Value) {
+  /// Insert \p Key with \p Value in cache
+  bool insertElement(const KeyType &Key, ValueType *Value) {
 
     if (Map.find(Key) == Map.end()) {
       Map.emplace(Key, Value);
+      return true;
     } else {
       std::cerr
           << "[CACHE] Warning: try to insert new element with existing key\n";
+      return false;
     }
   }
 
-  /// Remove \p Key and notify the cache policy after that
-  void eraseElement(const KeyType &Key) { Map.erase(Key); }
+  /// Remove \p Key and return its value for promotion or cascading eviction.
+  std::optional<ValueType *> eraseElement(const KeyType &Key) {
+    auto It = Map.find(Key);
+    if (It == Map.end()) {
+      return std::nullopt;
+    }
+
+    ValueType *Value = It->second;
+    Map.erase(It);
+    return Value;
+  }
 
   /// Return true if is enough space for one element in Cache
   bool hasFreeSpace(void) { return Map.size() < Capacity_; }
