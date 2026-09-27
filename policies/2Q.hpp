@@ -16,43 +16,52 @@ public:
     bool needInsertInCache(const KeyType &Key) override { return true; }
 
     void onCacheInsert(const KeyType &Key) override {
-        if (A1In_.size() + Am_.size() >= Capacity_) {
+        if (Index_.size() >= Capacity_) {
             std::cerr << "[2Q] Error: try to insert extra element (corrupted)\n";
             return;
         }
+
+        if (Index_.find(Key) != Index_.end()) {
+            std::cerr << "[2Q] Error: try to insert existing key (corrupted)\n";
+            return;
+        }
+
         A1In_.push_front(Key);
+        Index_[Key] = Entry{Queue::A1In, A1In_.begin()};
     }
 
     void onCacheHit(const KeyType &Key) override {
-        auto It = std::find(Am_.begin(), Am_.end(), Key);
-        if (It != Am_.end()) {
-            Am_.splice(Am_.begin(), Am_, It);
+        auto It = Index_.find(Key);
+        if (It == Index_.end()) {
+            std::cerr << "[2Q] Error: hit on unknown key (corrupted)\n";
             return;
         }
 
-        It = std::find(A1In_.begin(), A1In_.end(), Key);
-        if (It != A1In_.end()) {
-            Am_.splice(Am_.begin(), A1In_, It);
-            return;
+        Entry &E = It->second;
+        if (E.Where == Queue::Am) {
+            Am_.splice(Am_.begin(), Am_, E.It);
         }
-
-        std::cerr << "[2Q] Error: hit on unknown key (corrupted)\n";
+        else {
+            Am_.splice(Am_.begin(), A1In_, E.It);
+            E.Where = Queue::Am;
+        }
     }
 
     void onCacheErase(const KeyType &Key) override {
-        auto It = std::find(A1In_.begin(), A1In_.end(), Key);
-        if (It != A1In_.end()) {
-            A1In_.erase(It);
+        auto It = Index_.find(Key);
+        if (It == Index_.end()) {
+            std::cerr << "[2Q] Error: try to delete undefined element\n";
             return;
         }
 
-        It = std::find(Am_.begin(), Am_.end(), Key);
-        if (It != Am_.end()) {
-            Am_.erase(It);
-            return;
+        const Entry &E = It->second;
+        if (E.Where == Queue::A1In) {
+            A1In_.erase(E.It);
         }
-
-        std::cerr << "[2Q] Error: try to delete undefined element\n";
+        else {
+            Am_.erase(E.It);
+        }
+        Index_.erase(It);
     }
 
     std::optional<KeyType> selectVictim() override {
@@ -73,9 +82,20 @@ public:
 
 
 private:
-    std::list<KeyType> A1In_; // новички, FIFO
-    std::list<KeyType> Am_;   // горячие, LRU
+    enum class Queue { A1In, Am };
 
-    std::size_t Capacity_;   // всего мест
-    std::size_t A1Capacity_; // квота новичков
+    using ListIt = typename std::list<KeyType>::iterator;
+
+    struct Entry {
+        Queue Where;
+        ListIt It;
+    };
+
+    std::unordered_map<KeyType, Entry> Index_;
+
+    std::list<KeyType> A1In_; // newcomers, FIFO
+    std::list<KeyType> Am_;   // hot keys, LRU
+
+    std::size_t Capacity_;   // total number of slots
+    std::size_t A1Capacity_; // newcomers quota
 };
