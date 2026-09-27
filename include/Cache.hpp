@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../policies/2Q.hpp"
 #include "../policies/LFU.hpp"
 #include "../policies/LRU.hpp"
 #include "CachePolicy.hpp"
@@ -39,10 +40,15 @@ public:
             {"LRU",
              [](std::size_t Capacity) {
                return std::make_unique<LRUPolicy<KeyType>>(Capacity);
-             }                   },
-            {"LFU", [](std::size_t Capacity) {
+             }},
+            {"LFU",
+             [](std::size_t Capacity) {
                return std::make_unique<LFUPolicy<KeyType>>(Capacity);
-             }}
+             }},
+            {"2Q",
+             [](std::size_t Capacity) {
+               return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
+             }},
     };
 
     std::ifstream ConfigFile(ConfigFilename);
