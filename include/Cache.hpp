@@ -3,6 +3,7 @@
 #include "../policies/2Q.hpp"
 #include "../policies/LFU.hpp"
 #include "../policies/LRU.hpp"
+#include "../policies/ARC.hpp"
 #include "CachePolicy.hpp"
 
 #include <cstdint>
