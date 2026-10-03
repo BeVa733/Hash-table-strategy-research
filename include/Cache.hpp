@@ -50,7 +50,11 @@ public:
              [](std::size_t Capacity) {
                return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
              }},
-    };
+            {"ARC",                                    
+             [](std::size_t Capacity) {
+               return std::make_unique<ARCPolicy<KeyType>>(Capacity);
+             }},
+        };
 
     std::ifstream ConfigFile(ConfigFilename);
     if (!ConfigFile) {
