@@ -3,6 +3,7 @@
 #include "../policies/2Q.hpp"
 #include "../policies/LFU.hpp"
 #include "../policies/LRU.hpp"
+#include "../policies/ARC.hpp"
 #include "CachePolicy.hpp"
 
 #include <cstdint>
@@ -49,7 +50,11 @@ public:
              [](std::size_t Capacity) {
                return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
              }},
-    };
+            {"ARC",                                    
+             [](std::size_t Capacity) {
+               return std::make_unique<ARCPolicy<KeyType>>(Capacity);
+             }},
+        };
 
     std::ifstream ConfigFile(ConfigFilename);
     if (!ConfigFile) {
