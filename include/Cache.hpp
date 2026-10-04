@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../policies/2Q.hpp"
+#include "../policies/ARC.hpp"
 #include "../policies/LFU.hpp"
 #include "../policies/LRU.hpp"
 #include "CachePolicy.hpp"
@@ -48,6 +49,10 @@ public:
             {"2Q",
              [](std::size_t Capacity) {
                return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
+             }},
+            {"ARC",
+             [](std::size_t Capacity) {
+               return std::make_unique<ARCPolicy<KeyType>>(Capacity);
              }},
     };
 
