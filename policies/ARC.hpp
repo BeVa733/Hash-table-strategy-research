@@ -108,6 +108,12 @@ public:
     void onCacheInsert(const KeyType& Key) override {
 
         if (Entries_.find(Key) != Entries_.end()) {
+            std::cerr << "[ARC] Error: try to insert existing key (corrupted)\n";
+            return;
+        }
+
+        if (FreshCache_.size() + HotCache_.size() >= Capacity_) {
+            std::cerr << "[ARC] Error: try to insert extra element (corrupted)\n";
             return;
         }
 
@@ -154,6 +160,9 @@ public:
             } else {
                 eraseEntry(Key);
             }
+        } else {
+            std::cerr << "[ARC] Error: try to erase non-resident element (corrupted)\n";
+            return;
         }
 
         VictimGoesToGhost_ = false;
@@ -162,6 +171,7 @@ public:
     std::optional<KeyType> selectVictim(void) override {
 
         if (FreshCache_.empty() && HotCache_.empty()) {
+            std::cerr << "[ARC] Warning: try to search victim in empty cache\n";
             return std::nullopt;
         }
 
