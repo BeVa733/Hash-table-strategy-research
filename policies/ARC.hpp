@@ -54,7 +54,7 @@ public:
                                   : std::max<std::size_t>(1, HotGhosts_.size() / FreshGhosts_.size());
 
                 TargetSize_ = std::min(Capacity_, TargetSize_ + Delta);
-                removeEntry(Key);
+                eraseEntry(Key);
 
                 InsertAsHotCache_ = true;
                 VictimGoesToGhost_ = true;
@@ -70,7 +70,7 @@ public:
                                   : std::max<std::size_t>(1, FreshGhosts_.size() / HotGhosts_.size());
 
                 TargetSize_ = (TargetSize_ >= Delta) ? (TargetSize_ - Delta) : 0;
-                removeEntry(Key);
+                eraseEntry(Key);
 
                 LastMissWasFromHotGhosts_ = true;
                 InsertAsHotCache_ = true;
